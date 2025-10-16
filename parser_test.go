@@ -1,15 +1,24 @@
 package ssimparser
 
-import "testing"
+import (
+	"fmt"
+	"log"
+	"strings"
+	"testing"
+)
 
-const testScrMessage = `
-SCR
+func TestSingle(t *testing.T) {
+	const testScrMessage = `SCR
 S25
 15OCT
 KRK
 NLO3924 20OCT20OCT 1000000 082E75 1625WAW J
 `
 
-func TestScrParser_Parse_Basic(t *testing.T) {
-	parser := 
+	scr := NewScrParser()
+	message, err := scr.Parse(strings.NewReader(testScrMessage))
+	if err != nil {
+		log.Fatal("ssimparser: Fatal parse error")
+	}
+	fmt.Printf("%v\n", message)
 }

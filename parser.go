@@ -29,6 +29,10 @@ type ScrParser struct {
 	MIN_SSIM_LINE_LENGTH int
 }
 
+func NewScrParser() *ScrParser {
+	return &ScrParser{MIN_SSIM_LINE_LENGTH: 37}
+}
+
 func (scr *ScrParser) Parse(r io.Reader) (*SCRMessage, error) {
 	message := &SCRMessage{
 		AdministrativeLines: make([]string, 0),
@@ -57,12 +61,14 @@ func (scr *ScrParser) Parse(r io.Reader) (*SCRMessage, error) {
 		}
 		if headerComplete {
 			switch {
-			case scr.isSlotDataLine(line, lineNumber):
-				item, err := scr.parseData(line, lineNumber)
+			case scr.isSlotDataLine(line):
+				items, err := scr.parseData(line, lineNumber, message.AirportCode)
 				if err != nil {
 					return nil, err
 				}
-				item.SlotKey = item.GetSlotKey(message.AirportCode)
+				for _, item := range items {
+					item.GetSlotKey(message.AirportCode)
+				}
 
 			case strings.HasPrefix(line, "GI"):
 				message.GeneralInfo += line[2:]
@@ -78,7 +84,7 @@ func (scr *ScrParser) Parse(r io.Reader) (*SCRMessage, error) {
 func (scr *ScrParser) parseHeader(line string, message *SCRMessage, lineNumber int) error {
 	tokens := strings.Fields(line)
 
-	if lineNumber == 1 && line == "SCR" {
+	if line == "SCR" {
 		message.Identifier = "SCR"
 		return nil
 	}
@@ -113,15 +119,27 @@ func (scr *ScrParser) parseData(line string, lineNumber int, messageAirportCode 
 	if len(tokens) == 8 {
 		turnarounds, err := parseTurnaroundLine(tokens, line, lineNumber)
 		if err != nil {
-			return nil, errors.New("ssimparser: parsing turnaround parser error", err)
+			return nil, errors.New("ssimparser: parsing turnaround parser error")
 		}
 		bucket = append(bucket, turnarounds...)
 	} else {
 		slot, err := parseSingularLine(tokens, line, lineNumber)
 		if err != nil {
-			return nil, errors.New("ssimparser: single slot parser error", err)
+			return nil, errors.New("ssimparser: single slot parser error")
 		}
 		bucket = append(bucket, slot)
 	}
 	return bucket, nil
+}
+
+// ssimparser/parser.go or ssimparser/parser_util.go
+
+// isSlotDataLine checks if a line starts with a recognized Action Code,
+// indicating it is a Schedule Information Data Line (SlotItem data).
+func (p *ScrParser) isSlotDataLine(line string) bool {
+	if len(line) >= p.MIN_SSIM_LINE_LENGTH {
+		return true
+	}
+	return false
+	//TODO: Add better check later
 }

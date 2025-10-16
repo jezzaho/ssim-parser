@@ -1,6 +1,7 @@
 package ssimparser
 
 import (
+	"errors"
 	"slices"
 	"strconv"
 	"strings"
@@ -85,13 +86,21 @@ func parseTurnaroundLine(tokens []string, line string, lineNumber int) ([]*SlotI
 	// Individual data fields
 	departureAirport := tokens[5][:3]
 	departureTime := tokens[5][3:]
-	departure.CarrierCode = getCarrierCode(tokens[0][1:])
-	departure.FlightNumber = getFlightNumber(tokens[0][1:])
+	carrier, fno, err := getFlightDetail(tokens[1])
+	if err != nil {
+		return nil, errors.New("ssimparser: flight detail parse error")
+	}
+	departure.CarrierCode = carrier
+	departure.FlightNumber = fno
 
 	arrivalAirport := tokens[6][4:]
 	arrivalTime := tokens[6][:4]
-	arrival.CarrierCode = getCarrierCode(tokens[1])
-	arrival.CarrierCode = getFlightNumber(tokens[1])
+	carrier, fno, err = getFlightDetail(tokens[0][1:])
+	if err != nil {
+		return nil, errors.New("ssimparser: flight detail parse error")
+	}
+	arrival.CarrierCode = carrier
+	arrival.FlightNumber = fno
 
 	departure.DepartureAirport = departureAirport
 	departure.DepartureTimeUTC = departureTime
@@ -111,7 +120,7 @@ func parseTurnaroundLine(tokens []string, line string, lineNumber int) ([]*SlotI
 func parseSingularLine(tokens []string, line string, lineNumber int) (*SlotItem, error) {
 	flight := &SlotItem{LineNumber: lineNumber, RawDataLine: line}
 	isDeparture := false
-	if len(tokens[0] == 1) {
+	if len(tokens[0]) == 1 {
 		isDeparture = true
 	}
 	if isDeparture {
@@ -123,8 +132,12 @@ func parseSingularLine(tokens []string, line string, lineNumber int) (*SlotItem,
 	}
 	//->>>K<<<--LO010 24OCT24OCT 0000500 252788 ORD0730 J
 	//LO010 24OCT24OCT 0000500 252788 0730ORD J
-	flight.CarrierCode = getCarrierCode(tokens[0])
-	flight.FlightNumber = getFlightNumber(tokens[0])
+	carrier, fno, err := getFlightDetail(tokens[0])
+	if err != nil {
+		return nil, errors.New("ssimparser: flight detail parser error")
+	}
+	flight.CarrierCode = carrier
+	flight.FlightNumber = fno
 
 	//Shared fields
 	flight.PeriodOfOperation = tokens[1]
@@ -140,12 +153,19 @@ func parseSingularLine(tokens []string, line string, lineNumber int) (*SlotItem,
 	}
 	flight.RawDataLine = line
 	flight.LineNumber = lineNumber
+
+	return flight, nil
 }
 
-func getCarrierCode(str string) string {
-	// XX123
-	// XXX123
-	// XX1234
-	// XXX1234
-
+func getFlightDetail(str string) (string, string, error) {
+	// Test case with three last digits being flight number
+	carrier := str[:len(str)-3]
+	digits := "0123456789"
+	if len(carrier) >= 3 && strings.ContainsAny(carrier, digits) {
+		return str[:2], str[2:], nil
+	}
+	if len(carrier) >= 3 && !strings.ContainsAny(carrier, digits) {
+		return str[:3], str[3:], nil
+	}
+	return "", "", errors.New("ssimparser: couldn't parse flight details")
 }

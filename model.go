@@ -93,8 +93,8 @@ const (
 	ActionDeclineOffer       ActionCode = "Z" // Decline Offer
 	//Coordinator Action Codes
 	ActionHoldingSlot   ActionCode = "H" // Holding Slot
-	ActionConfirmSlot   ActionCode = "K" // New/Revise Slot Confirmation
-	ActionOfferSlot     ActionCode = "O" // Offer
+	ActionConfirmation  ActionCode = "K" // New/Revise Slot Confirmation
+	ActionOffer         ActionCode = "O" // Offer
 	ActionPendingSlot   ActionCode = "P" // Request Pending
 	ActionConditionSlot ActionCode = "T" // Allocated Slots subject to Conditions
 	ActionUnableSlot    ActionCode = "U" // Unable to Confirm, Slot not allocated
