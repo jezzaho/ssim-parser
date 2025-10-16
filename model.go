@@ -42,7 +42,7 @@ type SlotItem struct {
 	AircraftType      string // IATA 3-letter CODE
 	Configuration     string // Capacity/Seats
 
-	ServiceType []ServiceType
+	ServiceType ServiceType
 
 	// Arrival data - if exists
 	ArrivalAirport     string
@@ -65,8 +65,10 @@ func (s SlotItem) GetSlotKey(clearanceAirport string) string {
 	return fmt.Sprintf("%s-%s-%s-%s-%s",
 		s.CarrierCode,
 		s.FlightNumber,
-		s.PeriodOfOperation.EffectiveDate,
-		s.PeriodOfOperation.TerminationDate,
+		//FIXME: fix this later
+		"a", "b",
+		//s.PeriodOfOperation.EffectiveDate,
+		//s.PeriodOfOperation.TerminationDate,
 		clearanceAirport,
 	)
 }
