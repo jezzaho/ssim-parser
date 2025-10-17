@@ -1,6 +1,9 @@
 package ssimparser
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // SCR
 //      S23
@@ -21,10 +24,86 @@ type SCRMessage struct {
 	// Administrative lines
 	AdministrativeLines []string
 	//Payload core: slice of the individual slot requests/replies
-	Items []SlotItem
+	Items []*SlotItem
 	// Optional addtional information GI - General Information, SI - Supplementary Information
 	GeneralInfo string
 	SpecialInfo string
+}
+
+func (msg SCRMessage) PrettyPrint() string {
+	var sb strings.Builder
+
+	sb.WriteString("=========== SCR MESSAGE ===========\n")
+	sb.WriteString(fmt.Sprintf("Identifier:   %s\n", msg.Identifier))
+	sb.WriteString(fmt.Sprintf("Season:       %s\n", msg.Season))
+	sb.WriteString(fmt.Sprintf("Message Date: %s\n", msg.MessageDate))
+	sb.WriteString(fmt.Sprintf("Airport Code: %s\n", msg.AirportCode))
+	sb.WriteString("-----------------------------------\n")
+
+	if len(msg.AdministrativeLines) > 0 {
+		sb.WriteString("Administrative Lines:\n")
+		for _, line := range msg.AdministrativeLines {
+			sb.WriteString(fmt.Sprintf("  - %s\n", line))
+		}
+		sb.WriteString("-----------------------------------\n")
+	}
+
+	if len(msg.Items) > 0 {
+		sb.WriteString("Slot Items:\n")
+		for i, item := range msg.Items {
+			sb.WriteString(item.prettyPrint(i + 1))
+		}
+		sb.WriteString("-----------------------------------\n")
+	}
+
+	if msg.GeneralInfo != "" {
+		sb.WriteString("General Information (GI):\n")
+		sb.WriteString(fmt.Sprintf("  %s\n", msg.GeneralInfo))
+		sb.WriteString("-----------------------------------\n")
+	}
+
+	if msg.SpecialInfo != "" {
+		sb.WriteString("Special Information (SI):\n")
+		sb.WriteString(fmt.Sprintf("  %s\n", msg.SpecialInfo))
+		sb.WriteString("-----------------------------------\n")
+	}
+
+	return sb.String()
+}
+
+func (s SlotItem) prettyPrint(index int) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("  #%d\n", index))
+	sb.WriteString(fmt.Sprintf("    Action Code:        %s\n", s.ActionCode))
+	sb.WriteString(fmt.Sprintf("    Carrier / Flight:   %s %s\n", s.CarrierCode, s.FlightNumber))
+	sb.WriteString(fmt.Sprintf("    Period of Operation:%s\n", s.PeriodOfOperation))
+	sb.WriteString(fmt.Sprintf("    Days of Operation:  %s\n", s.DaysOfOperation))
+	if s.AircraftType != "" {
+		sb.WriteString(fmt.Sprintf("    Aircraft Type:      %s\n", s.AircraftType))
+	}
+	if s.Configuration != "" {
+		sb.WriteString(fmt.Sprintf("    Configuration:      %s\n", s.Configuration))
+	}
+	if s.ServiceType != "" {
+		sb.WriteString(fmt.Sprintf("    Service Type:       %s\n", s.ServiceType))
+	}
+
+	if s.DepartureAirport != "" {
+		sb.WriteString(fmt.Sprintf("    Departure:          %s at %s UTC\n",
+			s.DepartureAirport, s.DepartureTimeUTC))
+	}
+	if s.ArrivalAirport != "" {
+		sb.WriteString(fmt.Sprintf("    Arrival:            %s at %s UTC (ΔDay %+d)\n",
+			s.ArrivalAirport, s.ArrivalTimeUTC, s.DayChangeIndicator))
+	}
+
+	if s.SlotKey != "" {
+		sb.WriteString(fmt.Sprintf("    Slot Key:           %s\n", s.SlotKey))
+	}
+
+	sb.WriteString(fmt.Sprintf("    Source Line #%d:    %s\n", s.LineNumber, s.RawDataLine))
+	sb.WriteString("  -----------------------------------\n")
+	return sb.String()
 }
 
 // Slot item represents a single slot transaction - request, reply or offer

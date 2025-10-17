@@ -36,7 +36,7 @@ func NewScrParser() *ScrParser {
 func (scr *ScrParser) Parse(r io.Reader) (*SCRMessage, error) {
 	message := &SCRMessage{
 		AdministrativeLines: make([]string, 0),
-		Items:               make([]SlotItem, 0),
+		Items:               make([]*SlotItem, 0),
 	}
 	headerComplete := false
 	lineNumber := 0
@@ -68,6 +68,7 @@ func (scr *ScrParser) Parse(r io.Reader) (*SCRMessage, error) {
 				}
 				for _, item := range items {
 					item.GetSlotKey(message.AirportCode)
+					message.Items = append(message.Items, item)
 				}
 
 			case strings.HasPrefix(line, "GI"):

@@ -67,18 +67,20 @@ func parseTurnaroundLine(tokens []string, line string, lineNumber int) ([]*SlotI
 	sharedActionCode := ActionCode(tokens[0][0:1])
 	rng := tokens[2]
 	doop := tokens[3]
-	cfg := tokens[4]
+	cfg, aircraft := getConfAndAicraft(tokens[4])
 
 	departure.ActionCode = sharedActionCode
 	departure.PeriodOfOperation = rng
 	departure.DaysOfOperation = doop
 	departure.Configuration = cfg
+	departure.AircraftType = aircraft
 	departure.RawDataLine = line
 	departure.LineNumber = lineNumber
 
 	arrival.ActionCode = sharedActionCode
 	arrival.PeriodOfOperation = rng
 	arrival.DaysOfOperation = doop
+	arrival.AircraftType = aircraft
 	arrival.Configuration = cfg
 	arrival.RawDataLine = line
 	arrival.LineNumber = lineNumber
@@ -124,11 +126,11 @@ func parseSingularLine(tokens []string, line string, lineNumber int) (*SlotItem,
 		isDeparture = true
 	}
 	if isDeparture {
-		flight.ActionCode = ActionCode(tokens[0][0:1])
-		tokens[0] = tokens[0][1:]
-	} else {
 		flight.ActionCode = ActionCode(tokens[0])
 		tokens = tokens[1:]
+	} else {
+		flight.ActionCode = ActionCode(tokens[0][0:1])
+		tokens[0] = tokens[0][1:]
 	}
 	//->>>K<<<--LO010 24OCT24OCT 0000500 252788 ORD0730 J
 	//LO010 24OCT24OCT 0000500 252788 0730ORD J
@@ -142,17 +144,21 @@ func parseSingularLine(tokens []string, line string, lineNumber int) (*SlotItem,
 	//Shared fields
 	flight.PeriodOfOperation = tokens[1]
 	flight.DaysOfOperation = tokens[2]
-	flight.Configuration = tokens[3]
+	cfg, aircraft := getConfAndAicraft(tokens[3])
+	flight.AircraftType = aircraft
+	flight.Configuration = cfg
 
 	if isDeparture {
 		flight.DepartureAirport = tokens[4][:3]
 		flight.DepartureTimeUTC = tokens[4][3:]
 	} else {
-		flight.ArrivalAirport = tokens[4][4:]
-		flight.ArrivalTimeUTC = tokens[4][:4]
+		flight.ArrivalAirport = tokens[4][:3]
+		flight.ArrivalTimeUTC = tokens[4][3:]
 	}
 	flight.RawDataLine = line
 	flight.LineNumber = lineNumber
+
+	//TODO: ADD aircrafttype and servicetype fields
 
 	return flight, nil
 }
@@ -164,8 +170,13 @@ func getFlightDetail(str string) (string, string, error) {
 	if len(carrier) >= 3 && strings.ContainsAny(carrier, digits) {
 		return str[:2], str[2:], nil
 	}
-	if len(carrier) >= 3 && !strings.ContainsAny(carrier, digits) {
-		return str[:3], str[3:], nil
+	if len(carrier) < 3 && !strings.ContainsAny(carrier, digits) {
+		return str[:2], str[2:], nil
 	}
 	return "", "", errors.New("ssimparser: couldn't parse flight details")
+}
+func getConfAndAicraft(str string) (string, string) {
+	// conf-seat/aicraft code map is always six digit and in form XXXYYY
+	//capacity-conf is always padded with zeros if necessary
+	return str[:3], str[3:]
 }
