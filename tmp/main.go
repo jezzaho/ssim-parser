@@ -23,7 +23,7 @@ SI HAPPYEASTERACKACK
 	scr := ssimparser.NewScrParser()
 	message, err := scr.Parse(strings.NewReader(testScrMessage))
 	if err != nil {
-		log.Fatal("ssimparser: Fatal parse error")
+		log.Fatal(err.Error())
 	}
 	fmt.Println(message.PrettyPrint())
 }
