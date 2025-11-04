@@ -26,6 +26,7 @@ type SCRParser interface {
 
 type ScrParser struct {
 	MIN_SSIM_LINE_LENGTH int
+	validator            *ParsingValidator // Optional validator for collecting issues
 }
 
 // Non-Argument Initializer
@@ -38,7 +39,63 @@ func NewScrParserWithMinLength(minLength int) *ScrParser {
 	return &ScrParser{MIN_SSIM_LINE_LENGTH: minLength}
 }
 
-func (scr *ScrParser) Parse(r io.Reader) (*SCRMessage, error) {
+// NewScrParserWithValidator creates a parser with an embedded validator.
+// This allows the parser to collect validation issues during parsing.
+// The validator can be used to track minor, major, and critical issues.
+//
+// Usage:
+//
+//	parser := NewScrParserWithValidator()
+//	message, err := parser.Parse(reader)
+//	if err != nil { /* handle critical parsing error */ }
+//	validator := parser.GetValidator()
+//	validator.ValidateSCR(message) // post-parse validation
+//	report := validator.Report() // get validation report
+func NewScrParserWithValidator() *ScrParser {
+	return &ScrParser{
+		MIN_SSIM_LINE_LENGTH: 37,
+		validator:            NewParsingValidator(),
+	}
+}
+
+// NewScrParserWithValidatorAndMinLength creates a parser with validator and custom min length
+func NewScrParserWithValidatorAndMinLength(minLength int) *ScrParser {
+	return &ScrParser{
+		MIN_SSIM_LINE_LENGTH: minLength,
+		validator:            NewParsingValidator(),
+	}
+}
+
+// SetValidator attaches a validator to the parser.
+// This allows you to use a shared validator across multiple parsers,
+// or attach a validator to an existing parser.
+func (scr *ScrParser) SetValidator(v *ParsingValidator) {
+	scr.validator = v
+}
+
+// GetValidator returns the parser's validator (creates one if none exists).
+// Use this to access the validator after parsing to check for validation issues.
+func (scr *ScrParser) GetValidator() *ParsingValidator {
+	if scr.validator == nil {
+		scr.validator = NewParsingValidator()
+	}
+	return scr.validator
+}
+
+// HasValidator returns true if the parser has a validator attached.
+// Useful for checking if validation is enabled before accessing the validator.
+func (scr *ScrParser) HasValidator() bool {
+	return scr.validator != nil
+}
+
+// addValidationIssue adds a validation issue to the parser's validator if one exists
+func (scr *ScrParser) addValidationIssue(message string, lineNumber int, rawLine string, err error, severity SCRErrorLevel) {
+	if scr.validator != nil {
+		scr.validator.AddError(NewParserError(message, lineNumber, rawLine, err, severity))
+	}
+}
+
+func (scr *ScrParser) Parse(r io.Reader) (*SCRMessage, *ParserError) {
 	message := &SCRMessage{
 		AdministrativeLines: make([]string, 0),
 		Items:               make([]*SlotItem, 0),
@@ -58,7 +115,7 @@ func (scr *ScrParser) Parse(r io.Reader) (*SCRMessage, error) {
 			if scr.isSlotDataLine(line) || strings.HasPrefix(line, "GI") || strings.HasPrefix(line, "SI") {
 				headerComplete = true
 			} else {
-				if err := scr.parseHeader(line, message, lineNumber); err.Err != nil {
+				if err := scr.parseHeader(line, message, lineNumber); err != nil {
 					return nil, err
 				}
 				continue
@@ -68,7 +125,7 @@ func (scr *ScrParser) Parse(r io.Reader) (*SCRMessage, error) {
 			switch {
 			case scr.isSlotDataLine(line):
 				items, err := scr.parseData(line, lineNumber, message.AirportCode)
-				if err.Err != nil {
+				if err != nil {
 					return nil, err
 				}
 				for _, item := range items {
@@ -87,32 +144,32 @@ func (scr *ScrParser) Parse(r io.Reader) (*SCRMessage, error) {
 	return message, nil
 }
 
-func (scr *ScrParser) parseHeader(line string, message *SCRMessage, lineNumber int) ParserError {
+func (scr *ScrParser) parseHeader(line string, message *SCRMessage, lineNumber int) *ParserError {
 	tokens := strings.Fields(line)
 
 	if line == "SCR" {
 		message.Identifier = "SCR"
-		return ParserError{}
+		return nil
 	}
 	//Process single-field lines
 	if len(tokens) == 1 {
 		if message.Season == "" && len(tokens[0]) == 3 && (tokens[0][0] == 'S' || tokens[0][0] == 'W') {
 			message.Season = tokens[0]
-			return ParserError{}
+			return nil
 		}
 		if message.MessageDate == "" && len(tokens[0]) == 5 && isDateDDMMM(tokens[0]) {
 			message.MessageDate = tokens[0]
-			return ParserError{}
+			return nil
 		}
 		if message.AirportCode == "" && len(tokens[0]) == 3 {
 			message.AirportCode = tokens[0]
-			return ParserError{}
+			return nil
 		}
 	}
 	// Process rest as administrative
 	message.AdministrativeLines = append(message.AdministrativeLines, line)
 
-	return ParserError{}
+	return nil
 }
 func (scr *ScrParser) parseData(line string, lineNumber int, messageAirportCode string) ([]*SlotItem, *ParserError) {
 	tokens := strings.Fields(line)
@@ -125,13 +182,13 @@ func (scr *ScrParser) parseData(line string, lineNumber int, messageAirportCode 
 	if len(tokens) == 8 {
 		turnarounds, err := parseTurnaroundLine(tokens, line, lineNumber)
 		if err != nil {
-			return nil, NewParserError("ssimparser: parsing turnaround parser error", lineNumber, line, err)
+			return nil, NewParserError("ssimparser: parsing turnaround parser error", lineNumber, line, err, Critical)
 		}
 		bucket = append(bucket, turnarounds...)
 	} else {
 		slot, err := parseSingularLine(tokens, line, lineNumber)
 		if err != nil {
-			return nil, NewParserError("ssimparser: single slot parser error", lineNumber, line, err)
+			return nil, NewParserError("ssimparser: single slot parser error", lineNumber, line, err, Critical)
 		}
 		bucket = append(bucket, slot)
 	}

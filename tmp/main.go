@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"os"
 	"strings"
 
 	ssimparser "github.com/jezzaho/ssim-parser"
@@ -20,10 +20,35 @@ GI BRGDS
 SI HAPPYEASTERACKACK
 `
 
-	scr := ssimparser.NewScrParser()
-	message, err := scr.Parse(strings.NewReader(testScrMessage))
-	if err != nil {
-		log.Fatal(err.Error())
+	// Option 1: Create parser with embedded validator
+	scr := ssimparser.NewScrParserWithValidator()
+	message, parserError := scr.Parse(strings.NewReader(testScrMessage))
+
+	// Handle critical parsing errors (these stop parsing)
+	if parserError != nil && parserError.Err != nil {
+		fmt.Println(parserError.Error())
+		os.Exit(1)
 	}
+
+	// Validate the parsed message (checks for issues)
+	if scr.HasValidator() {
+		validator := scr.GetValidator()
+		validator.ValidateSCR(message)
+
+		// Check validation results
+		minor, major, critical := validator.AssesErrors()
+		if minor > 0 || major > 0 || critical > 0 {
+			fmt.Println("Validation Report:")
+			fmt.Println(validator.Report())
+			fmt.Println()
+		}
+
+		// You can decide whether to proceed based on validation results
+		if critical > 0 {
+			fmt.Println("Critical errors found - cannot proceed")
+			os.Exit(1)
+		}
+	}
+
 	fmt.Println(message.PrettyPrint())
 }

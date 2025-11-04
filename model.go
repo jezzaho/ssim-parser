@@ -76,7 +76,7 @@ func (s SlotItem) prettyPrint(index int) string {
 	sb.WriteString(fmt.Sprintf("  #%d\n", index))
 	sb.WriteString(fmt.Sprintf("    Action Code:        %s\n", s.ActionCode))
 	sb.WriteString(fmt.Sprintf("    Carrier / Flight:   %s %s\n", s.CarrierCode, s.FlightNumber))
-	sb.WriteString(fmt.Sprintf("    Period of Operation:%s\n", s.PeriodOfOperation))
+	sb.WriteString(fmt.Sprintf("%v\n", s.PeriodOfOperation.prettyPrint()))
 	sb.WriteString(fmt.Sprintf("    Days of Operation:  %s\n", s.DaysOfOperation))
 	if s.AircraftType != "" {
 		sb.WriteString(fmt.Sprintf("    Aircraft Type:      %s\n", s.AircraftType))
@@ -116,10 +116,10 @@ type SlotItem struct {
 	FlightNumber string
 
 	// ScheduleData
-	PeriodOfOperation string //Period FIXME: change to Period
-	DaysOfOperation   string //[]int FIXME: change to []int
-	AircraftType      string // IATA 3-letter CODE
-	Configuration     string // Capacity/Seats
+	PeriodOfOperation *PeriodOfOperation //Period FIXME: change to Period
+	DaysOfOperation   string             //[]int FIXME: change to []int
+	AircraftType      string             // IATA 3-letter CODE
+	Configuration     string             // Capacity/Seats
 
 	ServiceType ServiceType
 
@@ -196,7 +196,16 @@ const (
 	ServiceTypeTechStop     ServiceType = "X" // Technical stop
 )
 
-type Period struct {
+type PeriodOfOperation struct {
 	EffectiveDate   string //
 	TerminationDate string
+	DurationDays    int
+}
+
+func POOFromString(s string) (*PeriodOfOperation, error) {
+	return poocreator(s)
+}
+
+func (poo PeriodOfOperation) prettyPrint() string {
+	return fmt.Sprintf("Period of Operation: %s to %s (%d days)", poo.EffectiveDate, poo.TerminationDate, poo.DurationDays)
 }
