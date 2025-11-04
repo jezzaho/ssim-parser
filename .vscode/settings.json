@@ -1,0 +1,26 @@
+{
+  "go.useLanguageServer": true,
+  "go.gopath": "",
+  "go.goroot": "/opt/homebrew/Cellar/go/1.25.3/libexec",
+  "go.alternateTools": {
+    "go": "/opt/homebrew/bin/go"
+  },
+  "go.toolsManagement.checkForUpdates": "local",
+  "go.lintTool": "golangci-lint",
+  "go.lintOnSave": "package",
+  "go.vetOnSave": "package",
+  "go.formatTool": "goimports",
+  "go.languageServerExperimentalFeatures": {
+    "hoverKind": "FullDocumentation"
+  },
+  "[go]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "terminal.integrated.env.osx": {
+    "PATH": "/opt/homebrew/bin:${env:PATH}"
+  }
+}
+

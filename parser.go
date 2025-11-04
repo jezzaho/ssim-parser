@@ -2,7 +2,6 @@ package ssimparser
 
 import (
 	"bufio"
-	"errors"
 	"io"
 	"strings"
 )
@@ -29,8 +28,14 @@ type ScrParser struct {
 	MIN_SSIM_LINE_LENGTH int
 }
 
+// Non-Argument Initializer
 func NewScrParser() *ScrParser {
 	return &ScrParser{MIN_SSIM_LINE_LENGTH: 37}
+}
+
+// Argument Initializer
+func NewScrParserWithMinLength(minLength int) *ScrParser {
+	return &ScrParser{MIN_SSIM_LINE_LENGTH: minLength}
 }
 
 func (scr *ScrParser) Parse(r io.Reader) (*SCRMessage, error) {
@@ -53,7 +58,7 @@ func (scr *ScrParser) Parse(r io.Reader) (*SCRMessage, error) {
 			if scr.isSlotDataLine(line) || strings.HasPrefix(line, "GI") || strings.HasPrefix(line, "SI") {
 				headerComplete = true
 			} else {
-				if err := scr.parseHeader(line, message, lineNumber); err != nil {
+				if err := scr.parseHeader(line, message, lineNumber); err.Err != nil {
 					return nil, err
 				}
 				continue
@@ -63,7 +68,7 @@ func (scr *ScrParser) Parse(r io.Reader) (*SCRMessage, error) {
 			switch {
 			case scr.isSlotDataLine(line):
 				items, err := scr.parseData(line, lineNumber, message.AirportCode)
-				if err != nil {
+				if err.Err != nil {
 					return nil, err
 				}
 				for _, item := range items {
@@ -82,34 +87,34 @@ func (scr *ScrParser) Parse(r io.Reader) (*SCRMessage, error) {
 	return message, nil
 }
 
-func (scr *ScrParser) parseHeader(line string, message *SCRMessage, lineNumber int) error {
+func (scr *ScrParser) parseHeader(line string, message *SCRMessage, lineNumber int) ParserError {
 	tokens := strings.Fields(line)
 
 	if line == "SCR" {
 		message.Identifier = "SCR"
-		return nil
+		return ParserError{}
 	}
 	//Process single-field lines
 	if len(tokens) == 1 {
 		if message.Season == "" && len(tokens[0]) == 3 && (tokens[0][0] == 'S' || tokens[0][0] == 'W') {
 			message.Season = tokens[0]
-			return nil
+			return ParserError{}
 		}
 		if message.MessageDate == "" && len(tokens[0]) == 5 && isDateDDMMM(tokens[0]) {
 			message.MessageDate = tokens[0]
-			return nil
+			return ParserError{}
 		}
 		if message.AirportCode == "" && len(tokens[0]) == 3 {
 			message.AirportCode = tokens[0]
-			return nil
+			return ParserError{}
 		}
 	}
 	// Process rest as administrative
 	message.AdministrativeLines = append(message.AdministrativeLines, line)
 
-	return nil
+	return ParserError{}
 }
-func (scr *ScrParser) parseData(line string, lineNumber int, messageAirportCode string) ([]*SlotItem, error) {
+func (scr *ScrParser) parseData(line string, lineNumber int, messageAirportCode string) ([]*SlotItem, *ParserError) {
 	tokens := strings.Fields(line)
 	bucket := make([]*SlotItem, 0, 2)
 
@@ -120,13 +125,13 @@ func (scr *ScrParser) parseData(line string, lineNumber int, messageAirportCode 
 	if len(tokens) == 8 {
 		turnarounds, err := parseTurnaroundLine(tokens, line, lineNumber)
 		if err != nil {
-			return nil, errors.New("ssimparser: parsing turnaround parser error")
+			return nil, NewParserError("ssimparser: parsing turnaround parser error", lineNumber, line, err)
 		}
 		bucket = append(bucket, turnarounds...)
 	} else {
 		slot, err := parseSingularLine(tokens, line, lineNumber)
 		if err != nil {
-			return nil, errors.New("ssimparser: single slot parser error")
+			return nil, NewParserError("ssimparser: single slot parser error", lineNumber, line, err)
 		}
 		bucket = append(bucket, slot)
 	}
